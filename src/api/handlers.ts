@@ -13,7 +13,16 @@ export const handlers = [
     const body = (await request.json()) as { x: number; y: number; part: string; content: string }
     const sample = samples.find((item) => item.id === params.id)
     if (!sample) return new HttpResponse(null, { status: 404 })
-    sample.annotations.push({ id: `AN-${Date.now()}`, author: '当前用户', status: '待处理', ...body })
+    sample.annotations.push({
+      id: `AN-${Date.now()}`,
+      changeId: `CH-${Date.now()}`,
+      author: '当前用户',
+      status: '待处理',
+      createdAt: new Date().toISOString(),
+      syncedAt: new Date().toISOString(),
+      origin: 'remote',
+      ...body,
+    })
     return HttpResponse.json(sample, { status: 201 })
   }),
   http.post('/api/samples/:id/comments', async ({ params, request }) => {

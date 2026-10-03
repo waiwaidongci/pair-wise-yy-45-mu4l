@@ -29,12 +29,12 @@ export const seedSamples: Sample[] = [
       第三轮: measurements(0.3),
     },
     annotations: [
-      { id: 'AN-01', x: 64, y: 24, part: '领口', content: '领尖略外翘，收窄 0.8cm 并增加领底衬。', author: '陈曼 / 产品', status: '待处理' },
-      { id: 'AN-02', x: 42, y: 51, part: '腰节', content: '抽绳孔位比设计稿高 1.5cm，需要回落。', author: '周研 / 版师', status: '已解决' },
+      { id: 'AN-01', changeId: 'seed-AN-01', x: 64, y: 24, part: '领口', content: '领尖略外翘，收窄 0.8cm 并增加领底衬。', author: '陈曼 / 产品', status: '待处理', createdAt: '2026-09-27T10:00:00.000Z', syncedAt: '2026-09-27T10:00:00.000Z', origin: 'remote' },
+      { id: 'AN-02', changeId: 'seed-AN-02', x: 42, y: 51, part: '腰节', content: '抽绳孔位比设计稿高 1.5cm，需要回落。', author: '周研 / 版师', status: '已解决', createdAt: '2026-09-27T10:05:00.000Z', syncedAt: '2026-09-27T10:05:00.000Z', origin: 'remote' },
     ],
     proposals: [
-      { id: 'RV-01', author: '周研', role: '版师', content: '前片肩线内收 0.6cm，袖窿同步下落 0.3cm。', affectedPart: '肩袖', status: '待决定' },
-      { id: 'RV-02', author: '沈岚', role: '产品开发', content: '维持袖长，仅调整袖山吃势，避免改变视觉比例。', affectedPart: '袖山', status: '待决定' },
+      { id: 'RV-01', changeId: 'seed-RV-01', author: '周研', role: '版师', content: '前片肩线内收 0.6cm，袖窿同步下落 0.3cm。', affectedPart: '肩袖', status: '待决定', createdAt: '2026-09-27T10:10:00.000Z', syncedAt: '2026-09-27T10:10:00.000Z', origin: 'remote' },
+      { id: 'RV-02', changeId: 'seed-RV-02', author: '沈岚', role: '产品开发', content: '维持袖长，仅调整袖山吃势，避免改变视觉比例。', affectedPart: '袖山', status: '待决定', createdAt: '2026-09-27T10:15:00.000Z', syncedAt: '2026-09-27T10:15:00.000Z', origin: 'remote' },
     ],
     attachments: [
       { name: '第二轮正面.jpg', type: '样衣照片', owner: '沈岚' },
@@ -65,10 +65,10 @@ export const seedSamples: Sample[] = [
       第三轮: measurements(0),
     },
     annotations: [
-      { id: 'AN-11', x: 54, y: 40, part: '门襟', content: '门襟压线偏移，检查模板定位。', author: '顾恺 / 质检', status: '待处理' },
+      { id: 'AN-11', changeId: 'seed-AN-11', x: 54, y: 40, part: '门襟', content: '门襟压线偏移，检查模板定位。', author: '顾恺 / 质检', status: '待处理', createdAt: '2026-09-27T11:00:00.000Z', syncedAt: '2026-09-27T11:00:00.000Z', origin: 'remote' },
     ],
     proposals: [
-      { id: 'RV-11', author: '宁波原野', role: '供应商', content: '门襟增加定位钻眼，压线稳定性可控制在 ±0.2cm。', affectedPart: '门襟', status: '待决定' },
+      { id: 'RV-11', changeId: 'seed-RV-11', author: '宁波原野', role: '供应商', content: '门襟增加定位钻眼，压线稳定性可控制在 ±0.2cm。', affectedPart: '门襟', status: '待决定', createdAt: '2026-09-27T11:05:00.000Z', syncedAt: '2026-09-27T11:05:00.000Z', origin: 'remote' },
     ],
     attachments: [{ name: '第一轮背片.jpg', type: '样衣照片', owner: '陈曼' }],
     comments: [],

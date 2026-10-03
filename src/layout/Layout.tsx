@@ -3,6 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import {
   AppBar,
   Box,
+  Button,
   Chip,
   Drawer,
   IconButton,
@@ -20,6 +21,9 @@ import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined'
 import CompareArrowsOutlinedIcon from '@mui/icons-material/CompareArrowsOutlined'
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined'
 import CloudDoneOutlinedIcon from '@mui/icons-material/CloudDoneOutlined'
+import SyncIcon from '@mui/icons-material/Sync'
+import { useAppDispatch, useAppSelector } from '../app/hooks'
+import { syncAll } from '../app/sync'
 
 const nav = [
   { to: '/', label: '开发总览', icon: <DashboardOutlinedIcon /> },
@@ -30,6 +34,15 @@ const nav = [
 
 export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const dispatch = useAppDispatch()
+  const { lastSyncedAt, peerCount, samples, draftRevisions } = useAppSelector((state) => state.development)
+  const pendingCount = samples.reduce((sum, sample) => {
+    const pendingAnnotations = sample.annotations.filter((item) => item.origin === 'local' && item.syncedAt === null).length
+    const pendingProposals = sample.proposals.filter((item) => item.origin === 'local' && item.syncedAt === null).length
+    const pendingDrafts = (draftRevisions[sample.id] ?? []).filter((item) => item.origin === 'local' && item.syncedAt === null).length
+    return sum + pendingAnnotations + pendingProposals + pendingDrafts
+  }, 0)
+  const lastSynced = lastSyncedAt ? new Date(lastSyncedAt).toLocaleTimeString('zh-CN') : '尚未同步'
   const drawer = (
     <Box sx={{ width: 242, minHeight: '100%', bgcolor: '#262a2b', color: '#eef1ef' }}>
       <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1.2, borderBottom: '1px solid rgba(255,255,255,.1)' }}>
@@ -66,7 +79,22 @@ export default function Layout() {
           <CloudDoneOutlinedIcon sx={{ fontSize: 16, color: '#74b79d' }} />
           <Typography fontSize={11}>草稿已实时保存</Typography>
         </Box>
-        <Typography color="#8f9a98" fontSize={10} mt={0.8}>最后同步 16:42 · 3 位协作者</Typography>
+        <Typography color="#8f9a98" fontSize={10} mt={0.8}>
+          最后同步 {lastSynced} · {peerCount} 位协作者
+        </Typography>
+        {pendingCount > 0 && (
+          <Chip size="small" label={`${pendingCount} 项待同步`} color="warning" sx={{ mt: 0.8, height: 20, fontSize: 10 }} />
+        )}
+        <Button
+          size="small"
+          fullWidth
+          startIcon={<SyncIcon />}
+          onClick={() => dispatch(syncAll())}
+          sx={{ mt: 1, color: '#eef1ef', borderColor: 'rgba(255,255,255,.25)', fontSize: 11 }}
+          variant="outlined"
+        >
+          立即同步
+        </Button>
       </Box>
     </Box>
   )

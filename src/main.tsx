@@ -4,6 +4,7 @@ import { Provider } from 'react-redux'
 import { BrowserRouter } from 'react-router-dom'
 import { CssBaseline, ThemeProvider, createTheme } from '@mui/material'
 import { store } from './app/store'
+import SyncManager from './app/SyncManager'
 import App from './App'
 import './styles.css'
 
@@ -33,7 +34,9 @@ enableMocking().then(() => {
         <ThemeProvider theme={theme}>
           <CssBaseline />
           <BrowserRouter>
-            <App />
+            <SyncManager>
+              <App />
+            </SyncManager>
           </BrowserRouter>
         </ThemeProvider>
       </Provider>

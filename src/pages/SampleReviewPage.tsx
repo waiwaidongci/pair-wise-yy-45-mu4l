@@ -26,20 +26,42 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined'
 import AddLocationAltOutlinedIcon from '@mui/icons-material/AddLocationAltOutlined'
 import PhotoCameraBackOutlinedIcon from '@mui/icons-material/PhotoCameraBackOutlined'
+import SyncIcon from '@mui/icons-material/Sync'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
-import { decideProposal, saveDraft, setRounds, toggleAnnotation } from '../features/developmentSlice'
+import {
+  addAnnotation,
+  addProposal,
+  decideProposal,
+  saveDraft,
+  selectCurrentDraft,
+  selectPendingCount,
+  setRounds,
+  toggleAnnotation,
+} from '../features/developmentSlice'
+import { createChangeEnvelope, genId, syncAll } from '../app/sync'
 
 const rounds = ['第一轮', '第二轮', '第三轮'] as const
+
+const sourceLabel: Record<'local' | 'remote', string> = {
+  local: '本窗口',
+  remote: '协作者',
+}
 
 export default function SampleReviewPage() {
   const dispatch = useAppDispatch()
   const state = useAppSelector((root) => root.development)
   const sample = state.samples.find((item) => item.id === state.selectedId) ?? state.samples[0]
+  const currentDraft = useAppSelector((root) => selectCurrentDraft(root.development, sample.id))
+  const pendingCount = useAppSelector((root) => selectPendingCount(root.development, sample.id))
+
   const [annotationOpen, setAnnotationOpen] = useState(false)
+  const [proposalOpen, setProposalOpen] = useState(false)
   const [decisionDialog, setDecisionDialog] = useState<string | null>(null)
   const [decisionReason, setDecisionReason] = useState('')
   const [annotationDraft, setAnnotationDraft] = useState({ x: 50, y: 42, part: '版型', content: '' })
+  const [proposalDraft, setProposalDraft] = useState({ role: '版师', affectedPart: '肩袖', content: '' })
   const imageRef = useRef<HTMLDivElement>(null)
+  const draftInputRef = useRef<HTMLInputElement>(null)
 
   const comparison = useMemo(() => {
     const a = sample.measurements[state.roundA]
@@ -67,10 +89,31 @@ export default function SampleReviewPage() {
 
   const submitDecision = (decision: '已采纳' | '未采纳') => {
     if (!decisionDialog || !decisionReason.trim()) return
-    dispatch(decideProposal({ proposalId: decisionDialog, decision, reason: decisionReason, decidedAt: new Date().toLocaleString('zh-CN') }))
+    const proposal = sample.proposals.find((item) => item.id === decisionDialog)
+    if (!proposal) return
+    dispatch(
+      decideProposal(
+        createChangeEnvelope('decision', sample.id, '当前用户', {
+          proposalId: decisionDialog,
+          decision,
+          reason: decisionReason,
+          proposalSnapshot: {
+            id: proposal.id,
+            changeId: proposal.changeId,
+            content: proposal.content,
+            author: proposal.author,
+            role: proposal.role,
+            affectedPart: proposal.affectedPart,
+            status: decision,
+          },
+        }),
+      ),
+    )
     setDecisionDialog(null)
     setDecisionReason('')
   }
+
+  const lastSynced = state.lastSyncedAt ? new Date(state.lastSyncedAt).toLocaleTimeString('zh-CN') : '尚未同步'
 
   return (
     <Box className="page">
@@ -78,15 +121,37 @@ export default function SampleReviewPage() {
         <Box>
           <Typography className="eyebrow">SAMPLE REVIEW / 样品评审</Typography>
           <Typography component="h1" fontWeight={800}>{sample.styleCode} · 轮次对比</Typography>
-          <Typography color="text.secondary">尺寸差异超过容差自动高亮；图片批注与修改方案绑定到具体轮次。</Typography>
+          <Typography color="text.secondary">尺寸差异超过容差自动高亮；图片批注与修改方案绑定到具体轮次，按提交人和时间合并。</Typography>
         </Box>
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Chip
+            size="small"
+            icon={<SyncIcon />}
+            label={`${lastSynced} · ${state.peerCount} 位协作者${pendingCount > 0 ? ` · ${pendingCount} 项待同步` : ''}`}
+            color={pendingCount > 0 ? 'warning' : 'default'}
+            variant={pendingCount > 0 ? 'filled' : 'outlined'}
+          />
+          <Button size="small" onClick={() => dispatch(syncAll())}>立即同步</Button>
           <Button variant="outlined" startIcon={<PhotoCameraBackOutlinedIcon />}>上传样衣照片</Button>
-          <Button variant="contained" disabled={state.locked} onClick={() => dispatch(saveDraft({ sampleId: sample.id, notes: '评审草稿已保存' }))}>保存当前草稿</Button>
+          <Button
+            variant="contained"
+            disabled={state.locked}
+            onClick={() => {
+              const content = draftInputRef.current?.value ?? ''
+              dispatch(saveDraft(createChangeEnvelope('draft', sample.id, '当前用户', { content })))
+            }}
+          >
+            保存当前草稿
+          </Button>
         </Stack>
       </Box>
 
-      {state.locked && <Alert severity="success" sx={{ mb: 1.5 }}>该轮次已审核锁定。解锁后才能新增批注或采纳方案。</Alert>}
+      {state.locked && <Alert severity="success" sx={{ mb: 1.5 }}>该轮次已审核锁定，批注、方案与草稿均为只读，解锁后才能新增。</Alert>}
+      {pendingCount > 0 && !state.locked && (
+        <Alert severity="info" sx={{ mb: 1.5 }}>
+          有 {pendingCount} 项本地改动尚未并入共享版本，锁定前请先同步或在锁定时选择放弃 / 另存修订。
+        </Alert>
+      )}
       {sample.annotations.some((item) => item.status === '待处理') && (
         <Alert severity="warning" sx={{ mb: 1.5 }}>
           当前仍有 {sample.annotations.filter((item) => item.status === '待处理').length} 项待处理批注，审核锁定前必须逐项关闭。
@@ -146,14 +211,23 @@ export default function SampleReviewPage() {
           </Box>
           <Box sx={{ p: 1.5, borderTop: '1px solid #ece9e4' }}>
             <TextField
+              key={sample.id}
+              inputRef={draftInputRef}
               multiline
               minRows={2}
               fullWidth
               size="small"
               label="轮次评审草稿"
-              defaultValue={state.draftNotes[sample.id] ?? '第二轮肩袖活动量已改善；建议采纳肩线内收方案，第三轮复核举臂舒适度。'}
-              onBlur={(event) => dispatch(saveDraft({ sampleId: sample.id, notes: event.target.value }))}
+              defaultValue={currentDraft ?? '第二轮肩袖活动量已改善；建议采纳肩线内收方案，第三轮复核举臂舒适度。'}
+              onBlur={(event) => {
+                const content = event.target.value
+                if (content === (currentDraft ?? '')) return
+                dispatch(saveDraft(createChangeEnvelope('draft', sample.id, '当前用户', { content })))
+              }}
             />
+            <Typography color="text.secondary" fontSize={11} mt={0.6}>
+              草稿按提交人和时间追加保留，最近一份自动成为当前草稿；协作者的草稿不会被覆盖。
+            </Typography>
           </Box>
         </Box>
 
@@ -186,7 +260,7 @@ export default function SampleReviewPage() {
             <Box sx={{ position: 'absolute', left: 50, top: 96, width: 52, height: 200, border: '3px solid #526a65', borderRadius: '25px 8px 12px 25px', bgcolor: '#657d77', transform: 'rotate(7deg)' }} />
             <Box sx={{ position: 'absolute', right: 50, top: 96, width: 52, height: 200, border: '3px solid #526a65', borderRadius: '8px 25px 25px 12px', bgcolor: '#657d77', transform: 'rotate(-7deg)' }} />
             {sample.annotations.map((annotation) => (
-              <Tooltip key={annotation.id} title={`${annotation.part}：${annotation.content}`}>
+              <Tooltip key={annotation.changeId} title={`${annotation.part}：${annotation.content}（${annotation.author}）`}>
                 <Box
                   onClick={(event) => {
                     event.stopPropagation()
@@ -219,12 +293,25 @@ export default function SampleReviewPage() {
           </Box>
           <Stack spacing={1} sx={{ px: 1.5, pb: 1.5 }}>
             {sample.annotations.map((annotation) => (
-              <Box key={annotation.id} sx={{ p: 1.2, borderLeft: `3px solid ${annotation.status === '待处理' ? '#cf6236' : '#397c69'}`, bgcolor: '#f8f7f4', borderRadius: 1 }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Box key={annotation.changeId} sx={{ p: 1.2, borderLeft: `3px solid ${annotation.status === '待处理' ? '#cf6236' : '#397c69'}`, bgcolor: '#f8f7f4', borderRadius: 1 }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1}>
                   <Typography fontWeight={800} fontSize={12}>{annotation.part} · {annotation.author}</Typography>
-                  <Button size="small" onClick={() => dispatch(toggleAnnotation(annotation.id))}>查看</Button>
+                  <Stack direction="row" spacing={0.5} alignItems="center">
+                    <Chip
+                      size="small"
+                      label={sourceLabel[annotation.origin]}
+                      color={annotation.origin === 'local' ? 'primary' : 'secondary'}
+                      variant="outlined"
+                      sx={{ height: 18, fontSize: 10 }}
+                    />
+                    <Button size="small" onClick={() => dispatch(toggleAnnotation(annotation.id))}>查看</Button>
+                  </Stack>
                 </Stack>
                 <Typography color="text.secondary" fontSize={11} mt={0.4}>{annotation.content}</Typography>
+                <Typography color="#a09a94" fontSize={10} mt={0.4}>
+                  {new Date(annotation.createdAt).toLocaleString('zh-CN')}
+                  {annotation.syncedAt ? ` · 已并入 ${new Date(annotation.syncedAt).toLocaleTimeString('zh-CN')}` : ' · 待并入'}
+                </Typography>
               </Box>
             ))}
           </Stack>
@@ -232,15 +319,25 @@ export default function SampleReviewPage() {
       </Box>
 
       <Box className="panel" sx={{ mt: 1.5 }}>
-        <Box sx={{ px: 2, py: 1.4, borderBottom: '1px solid #ece9e4' }}>
+        <Box sx={{ px: 2, py: 1.4, borderBottom: '1px solid #ece9e4', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography fontWeight={800}>替代修改方案与采纳决定</Typography>
+          <Button size="small" variant="outlined" disabled={state.locked} onClick={() => setProposalOpen(true)}>提交替代方案</Button>
         </Box>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2,1fr)' }, gap: 1.5, p: 1.5 }}>
           {sample.proposals.map((proposal) => (
-            <Box key={proposal.id} sx={{ p: 1.5, border: '1px solid #e2dfda', borderRadius: 1.2 }}>
-              <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Box key={proposal.changeId} sx={{ p: 1.5, border: '1px solid #e2dfda', borderRadius: 1.2 }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1}>
                 <Typography fontWeight={800}>{proposal.affectedPart} · {proposal.role}</Typography>
-                <Chip size="small" label={proposal.status} color={proposal.status === '已采纳' ? 'success' : proposal.status === '未采纳' ? 'default' : 'warning'} />
+                <Stack direction="row" spacing={0.5} alignItems="center">
+                  <Chip
+                    size="small"
+                    label={sourceLabel[proposal.origin]}
+                    color={proposal.origin === 'local' ? 'primary' : 'secondary'}
+                    variant="outlined"
+                    sx={{ height: 18, fontSize: 10 }}
+                  />
+                  <Chip size="small" label={proposal.status} color={proposal.status === '已采纳' ? 'success' : proposal.status === '未采纳' ? 'default' : 'warning'} />
+                </Stack>
               </Stack>
               <Typography fontSize={13} mt={1}>{proposal.content}</Typography>
               <Typography color="text.secondary" fontSize={11} mt={0.7}>提交人：{proposal.author}</Typography>
@@ -269,12 +366,60 @@ export default function SampleReviewPage() {
             variant="contained"
             disabled={!annotationDraft.part.trim() || !annotationDraft.content.trim()}
             onClick={() => {
-              sample.annotations.push({ id: `AN-${Date.now()}`, author: '当前用户', status: '待处理', ...annotationDraft })
+              dispatch(
+                addAnnotation(
+                  createChangeEnvelope('annotation', sample.id, '当前用户', {
+                    id: genId('AN'),
+                    x: annotationDraft.x,
+                    y: annotationDraft.y,
+                    part: annotationDraft.part,
+                    content: annotationDraft.content,
+                    status: '待处理',
+                  }),
+                ),
+              )
               setAnnotationDraft({ x: 50, y: 42, part: '版型', content: '' })
               setAnnotationOpen(false)
             }}
           >
             添加并标记待处理
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={proposalOpen} onClose={() => setProposalOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>提交替代修改方案</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1.5} pt={1}>
+            <Stack direction="row" spacing={1}>
+              <TextField label="提交角色" value={proposalDraft.role} onChange={(event) => setProposalDraft({ ...proposalDraft, role: event.target.value })} />
+              <TextField label="影响部位" value={proposalDraft.affectedPart} onChange={(event) => setProposalDraft({ ...proposalDraft, affectedPart: event.target.value })} />
+            </Stack>
+            <TextField multiline minRows={3} label="改版内容" value={proposalDraft.content} onChange={(event) => setProposalDraft({ ...proposalDraft, content: event.target.value })} />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setProposalOpen(false)}>取消</Button>
+          <Button
+            variant="contained"
+            disabled={!proposalDraft.role.trim() || !proposalDraft.affectedPart.trim() || !proposalDraft.content.trim()}
+            onClick={() => {
+              dispatch(
+                addProposal(
+                  createChangeEnvelope('proposal', sample.id, '当前用户', {
+                    id: genId('RV'),
+                    role: proposalDraft.role,
+                    affectedPart: proposalDraft.affectedPart,
+                    content: proposalDraft.content,
+                    status: '待决定',
+                  }),
+                ),
+              )
+              setProposalDraft({ role: '版师', affectedPart: '肩袖', content: '' })
+              setProposalOpen(false)
+            }}
+          >
+            提交方案
           </Button>
         </DialogActions>
       </Dialog>
