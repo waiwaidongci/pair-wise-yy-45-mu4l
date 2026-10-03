@@ -3,6 +3,20 @@ import { seedSamples } from './seed'
 
 let samples = structuredClone(seedSamples)
 
+const meta = () => {
+  const timestamp = Date.now()
+  return {
+    id: `AN-${timestamp}`,
+    author: '当前用户',
+    status: '待处理' as const,
+    round: '第三轮' as const,
+    createdAt: new Date(timestamp).toLocaleString('zh-CN', { hour12: false }),
+    timestamp,
+    sourceWindow: 'MSW 接口',
+    clientId: 'msw',
+  }
+}
+
 export const handlers = [
   http.get('/api/samples', () => HttpResponse.json(samples)),
   http.get('/api/samples/:id', ({ params }) => {
@@ -13,7 +27,7 @@ export const handlers = [
     const body = (await request.json()) as { x: number; y: number; part: string; content: string }
     const sample = samples.find((item) => item.id === params.id)
     if (!sample) return new HttpResponse(null, { status: 404 })
-    sample.annotations.push({ id: `AN-${Date.now()}`, author: '当前用户', status: '待处理', ...body })
+    sample.annotations.push({ ...meta(), ...body })
     return HttpResponse.json(sample, { status: 201 })
   }),
   http.post('/api/samples/:id/comments', async ({ params, request }) => {

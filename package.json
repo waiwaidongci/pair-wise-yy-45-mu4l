@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 62045",
     "build": "tsc -b && vite build",
-    "preview": "vite preview --host 0.0.0.0 --port 62045"
+    "preview": "vite preview --host 0.0.0.0 --port 62045",
+    "test:collab": "esbuild scripts/collab.test.ts --bundle --platform=node --format=esm --outfile=scripts/collab.test.mjs && node scripts/collab.test.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

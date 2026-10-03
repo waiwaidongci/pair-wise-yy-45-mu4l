@@ -3,10 +3,13 @@ import AddPhotoAlternateOutlinedIcon from '@mui/icons-material/AddPhotoAlternate
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
 import { selectSample } from '../features/developmentSlice'
+import { useCollab } from '../features/collab/CollabProvider'
 
 export default function StylesPage() {
   const dispatch = useAppDispatch()
-  const { samples, selectedId } = useAppSelector((state) => state.development)
+  const { view } = useCollab()
+  const samples = view.samples
+  const selectedId = useAppSelector((state) => state.development.selectedId)
   const selected = samples.find((item) => item.id === selectedId) ?? samples[0]
 
   return (

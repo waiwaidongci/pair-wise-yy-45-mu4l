@@ -1,10 +1,11 @@
 import { Box, Button, Chip, LinearProgress, Stack, Typography } from '@mui/material'
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
 import { useNavigate } from 'react-router-dom'
-import { useAppSelector } from '../app/hooks'
+import { useCollab } from '../features/collab/CollabProvider'
 
 export default function OverviewPage() {
-  const samples = useAppSelector((state) => state.development.samples)
+  const { view } = useCollab()
+  const samples = view.samples
   const navigate = useNavigate()
   const pendingProposals = samples.reduce((sum, item) => sum + item.proposals.filter((proposal) => proposal.status === '待决定').length, 0)
   const pendingAnnotations = samples.reduce((sum, item) => sum + item.annotations.filter((annotation) => annotation.status === '待处理').length, 0)
